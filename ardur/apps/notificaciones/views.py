@@ -78,8 +78,49 @@ def resultado(request, pk):
             return redirect('notif-lote', pk=a.lote_id)
     return render(request, 'form.html', {'title': 'Registrar resultado', 'form': form, 'submit': 'Guardar resultado', 'help': str(a.expediente)})
 
-@roles_requeridos('JEFE_NOTIFICACIONES', 'CONSULTA')
+@roles_requeridos('JEFE_NOTIFICACIONES', 'NOTIFICADOR', 'CONSULTA')
 def notificadores(request):
-    from django.db.models import Count
-    users = get_user_model().objects.filter(groups__name='NOTIFICADOR').annotate(asignaciones=Count('asignacionnotificador')).order_by('username')
+    from django.db.models import Count, Q
+    users = get_user_model().objects.filter(groups__name='NOTIFICADOR')
+    if not tiene_rol(request.user, 'JEFE_NOTIFICACIONES', 'CONSULTA'):
+        users = users.filter(pk=request.user.pk)
+    users = users.annotate(
+        asignaciones=Count('asignacionnotificador'),
+        casas_notificadas=Count('asignacionnotificador__expediente__predio', distinct=True,
+            filter=Q(asignacionnotificador__estado='ENTREGADO')),
+    ).order_by('username')
     return render(request, 'notificaciones/notificadores.html', {'title': 'Notificadores', 'notificadores': users})
+
+
+@roles_requeridos('JEFE_NOTIFICACIONES', 'NOTIFICADOR', 'CONSULTA')
+def casas_notificadas(request, usuario_id):
+    from django.db.models import Q
+    from ardur.apps.auditoria.models import EventoAuditoria
+    users = get_user_model().objects.all()
+    if not tiene_rol(request.user, 'JEFE_NOTIFICACIONES', 'CONSULTA'):
+        users = users.filter(pk=request.user.pk)
+    notificador = get_object_or_404(users, pk=usuario_id)
+    rows = AsignacionNotificador.objects.filter(
+        usuario_notificador=notificador, estado='ENTREGADO',
+    ).select_related('expediente__predio', 'expediente__cliente', 'lote__orden')
+    buscar = request.GET.get('q', '').strip()
+    if buscar:
+        rows = rows.filter(Q(expediente__predio__direccion__icontains=buscar)
+            | Q(expediente__predio__clave_ante__icontains=buscar)
+            | Q(expediente__predio__clave_nuev__icontains=buscar)
+            | Q(expediente__cliente__nombres__icontains=buscar))
+    total_casas = rows.values('expediente__predio').distinct().count()
+    page = Paginator(rows.order_by('-fecha_creacion', '-pk'), 25).get_page(request.GET.get('page'))
+    events = EventoAuditoria.objects.filter(
+        entidad=AsignacionNotificador._meta.label, accion='RESULTADO_NOTIFICACION',
+        id_entidad__in=[str(a.pk) for a in page], despues__estado='ENTREGADO',
+    ).order_by('-fecha_creacion')
+    fechas = {}
+    for event in events:
+        fechas.setdefault(event.id_entidad, event.fecha_creacion)
+    for row in page:
+        row.fecha_registro = fechas.get(str(row.pk))
+    return render(request, 'notificaciones/casas.html', {
+        'title': 'Casas notificadas', 'notificador': notificador,
+        'page': page, 'buscar': buscar, 'total_casas': total_casas,
+    })

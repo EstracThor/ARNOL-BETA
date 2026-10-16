@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block actions %}<a class="btn btn-outline-secondary" href="{% url 'notif-notificadores' %}">Volver a notificadores</a>{% endblock %}
+{% block content %}
+<section class="panel">
+<p><strong>Notificador: {{ notificador.username }}</strong> · {{ total_casas }} predios · {{ page.paginator.count }} notificaciones entregadas.</p>
+<p>Solo se incluyen resultados actualmente marcados como entregados. Un predio puede aparecer en varios expedientes. La fecha indica cuándo se registró el resultado en el sistema.</p>
+<form method="get" class="d-flex gap-2 mb-3"><label class="visually-hidden" for="buscar">Buscar casa</label><input id="buscar" class="form-control" name="q" value="{{ buscar }}" placeholder="Dirección, clave catastral o contribuyente"><button class="btn btn-primary">Buscar</button><a class="btn btn-outline-secondary" href="{% url 'notif-casas' notificador.pk %}">Limpiar</a></form>
+<div class="table-responsive"><table class="table">
+<thead><tr><th>Casa / predio</th><th>Contribuyente</th><th>Expediente</th><th>Fecha de registro</th><th>Observaciones</th><th>Lote</th></tr></thead>
+<tbody>{% for a in page %}<tr>
+<td>{{ a.expediente.predio.direccion|default:'Sin dirección registrada' }}<br><small>Clave: {{ a.expediente.predio.clave_nuev|default:a.expediente.predio.clave_ante|default:'Sin clave' }}<br>Parroquia {{ a.expediente.predio.parroquia }} / zona {{ a.expediente.predio.zona }} / sector {{ a.expediente.predio.sector }}</small></td>
+<td>{{ a.expediente.cliente.nombres }}</td><td>{{ a.expediente }}</td>
+<td>{{ a.fecha_registro|date:'d/m/Y H:i'|default:'Sin fecha registrada' }}</td><td>{{ a.observaciones|default:'Sin observaciones' }}</td>
+<td><a href="{% url 'notif-lote' a.lote_id %}">Ver lote</a></td>
+</tr>{% empty %}<tr><td colspan="6">No hay casas notificadas para esta consulta.</td></tr>{% endfor %}</tbody>
+</table></div>{% include 'pagination.html' %}
+</section>
+{% endblock %}

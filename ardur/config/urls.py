@@ -42,6 +42,7 @@ urlpatterns = [
     path('notificaciones/lotes/<uuid:pk>/imprimir/', maps.listado_imprimible, name='notif-imprimir-lote'),
     path('notificaciones/asignaciones/<uuid:pk>/resultado/', notif.resultado, name='notif-resultado'),
     path('notificaciones/notificadores/', notif.notificadores, name='notif-notificadores'),
+    path('notificaciones/notificadores/<int:usuario_id>/casas/', notif.casas_notificadas, name='notif-casas'),
     path('notificaciones/mapa/', maps.mapa, name='notif-mapa'),
     path('auditoria/', audit.historial, name='auditoria'),
     path('documentos/carteras/<uuid:pk>/', docs.cartera_original, name='doc-cartera'),

@@ -310,3 +310,37 @@ class WorkflowTests(TestCase):
         subprocess.run([ogr, '-f', 'GPKG', str(incorrect), str(source)], check=True, capture_output=True)
         with self.assertRaises(ValidationError):
             importar_catastro(incorrect, '2026-08')
+
+    def test_notified_houses_registry_scope_search_and_corrections(self):
+        _, order, cases = self.casos()
+        assignments = []
+        for case, user in zip(cases, [self.n1, self.n2]):
+            registrar_preliminar(case.pk, self.fin)
+            transferir(case.pk, self.fin)
+            lot = crear_lote(order, date.today(), user, [case.pk], self.notif)
+            assignments.append(lot.asignaciones.get())
+        url = f'/notificaciones/notificadores/{self.n1.pk}/casas/'
+        self.client.force_login(self.n1)
+        self.assertContains(self.client.get(url), 'No hay casas notificadas')
+        registrar_resultado(assignments[0].pk, 'ENTREGADO', 'Recibido en domicilio', self.notif)
+        registrar_resultado(assignments[1].pk, 'ENTREGADO', 'Otro domicilio privado', self.notif)
+        response = self.client.get(url)
+        self.assertContains(response, 'Recibido en domicilio')
+        self.assertNotContains(response, 'Otro domicilio privado')
+        self.assertIsNotNone(response.context['page'][0].fecha_registro)
+        self.assertEqual(response.context['total_casas'], 1)
+        self.assertEqual(self.client.get(f'/notificaciones/notificadores/{self.n2.pk}/casas/').status_code, 404)
+        self.assertEqual(self.client.get('/notificaciones/notificadores/').context['notificadores'].count(), 1)
+        self.assertEqual(self.client.get(url, {'q': 'inexistente'}).context['total_casas'], 0)
+        self.assertEqual(self.client.get(url, {'q': '010203'}).context['total_casas'], 1)
+        for user in [self.notif, self.consulta]:
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(url).status_code, 200)
+        self.client.force_login(self.fin)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        registrar_resultado(assignments[0].pk, 'NO_LOCALIZADO', 'Resultado corregido', self.notif)
+        self.client.force_login(self.n1)
+        self.assertEqual(self.client.get(url).context['total_casas'], 0)
+        self.assertEqual(self.client.get('/notificaciones/notificadores/').context['notificadores'][0].casas_notificadas, 0)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)

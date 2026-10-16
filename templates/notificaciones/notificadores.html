@@ -1,1 +1,9 @@
-{% extends 'base.html' %}{% block content %}<section class="panel"><table class="table"><thead><tr><th>Usuario</th><th>Activo</th><th>Asignaciones</th></tr></thead><tbody>{% for n in notificadores %}<tr><td>{{ n.username }}</td><td>{{ n.is_active|yesno:'Sí,No' }}</td><td>{{ n.asignaciones }}</td></tr>{% endfor %}</tbody></table></section>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+<p>Consulta las casas con resultado entregado de cada notificador.</p>
+<div class="table-responsive"><table class="table">
+<thead><tr><th>Usuario</th><th>Activo</th><th>Asignaciones</th><th>Casas notificadas</th><th>Registro</th></tr></thead>
+<tbody>{% for n in notificadores %}<tr><td>{{ n.username }}</td><td>{{ n.is_active|yesno:'Sí,No' }}</td><td>{{ n.asignaciones }}</td><td>{{ n.casas_notificadas }}</td><td><a class="btn btn-sm btn-outline-primary" href="{% url 'notif-casas' n.pk %}">Ver casas notificadas</a></td></tr>{% empty %}<tr><td colspan="5">No hay notificadores registrados.</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}
